@@ -7,27 +7,23 @@ st.set_page_config(page_title="Birb Study Tool", page_icon="🌲", layout="cente
 
 st.markdown("""
     <style>
-    /* Earthy background */
-    .stApp { background-color: #f4f1e1; } 
-    
-    /* Dark wood text */
-    h1, h2, h3, p, label { color: #3e2723 !important; } 
-    
     /* Woodsy Buttons */
     .stButton>button {
         background-color: #6d4c41; 
-        color: white;
+        color: white !important;
         border-radius: 8px;
         border: none;
         transition: 0.3s;
         width: 100%;
         font-weight: bold;
     }
-    .stButton>button:hover { background-color: #4e342e; color: white; }
+    .stButton>button p { color: white !important; }
+    .stButton>button:hover { background-color: #4e342e; color: white !important; }
     
     /* Answer Boxes */
     .answer-box {
         background-color: #ffffff;
+        color: #2e2e2e;
         padding: 20px;
         border-radius: 10px;
         border-left: 8px solid #2e7d32; 
@@ -41,7 +37,7 @@ st.markdown("""
     /* Tabs */
     .stTabs [data-baseweb="tab-list"] { gap: 20px; }
     .stTabs [data-baseweb="tab"] { height: 50px; white-space: pre-wrap; background-color: transparent; border-radius: 5px 5px 0 0; gap: 1px; padding-top: 10px; padding-bottom: 10px; }
-    .stTabs [aria-selected="true"] { background-color: #e8e6d9; border-bottom: 3px solid #2e7d32; }
+    .stTabs [aria-selected="true"] { border-bottom: 3px solid #2e7d32; }
     </style>
 """, unsafe_allow_html=True)
 
