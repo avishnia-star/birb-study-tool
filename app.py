@@ -30,7 +30,7 @@ st.markdown("""
         background-color: #ffffff;
         padding: 20px;
         border-radius: 10px;
-        border-left: 8px solid #2e7d32; /* Pine green */
+        border-left: 8px solid #2e7d32; 
         margin-top: 20px;
         text-align: center;
         box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
@@ -44,8 +44,6 @@ st.markdown("""
     .stTabs [aria-selected="true"] { background-color: #e8e6d9; border-bottom: 3px solid #2e7d32; }
     </style>
 """, unsafe_allow_html=True)
-
-st.title("🌲 Birb Study Tool 🦉")
 
 # --- DATA LOADING ---
 @st.cache_data
@@ -80,31 +78,50 @@ if not st.session_state.birds:
     st.error("No birds found in the 'media' folder. Check your files.")
     st.stop()
 
-# --- STATE MANAGEMENT ---
-# Setup for Flashcards (Shuffled Deck)
-if 'fc_order' not in st.session_state:
-    st.session_state.fc_order = list(range(len(st.session_state.birds)))
+# --- STATE MANAGEMENT & FILTERING ---
+if 'starred' not in st.session_state:
+    st.session_state.starred = set()
+
+# Sidebar Filter
+with st.sidebar:
+    st.header("⚙️ Study Settings")
+    use_filter = st.checkbox("⭐ Study Starred Birds Only", value=False)
+    
+    if use_filter and len(st.session_state.starred) == 0:
+        st.warning("You haven't starred any birds yet! Showing all birds for now.")
+        
+    st.write("---")
+    st.write(f"**Starred Birds:** {len(st.session_state.starred)} / {len(st.session_state.birds)}")
+
+# Determine Active Pool of Birds
+if use_filter and len(st.session_state.starred) > 0:
+    active_birds = [b for b in st.session_state.birds if b["name"] in st.session_state.starred]
+else:
+    active_birds = st.session_state.birds
+
+# Detect if the pool changed (e.g., filter toggled) to safely rebuild the decks
+current_pool_names = set([b["name"] for b in active_birds])
+if 'last_pool_names' not in st.session_state or st.session_state.last_pool_names != current_pool_names:
+    st.session_state.fc_order = list(range(len(active_birds)))
     random.shuffle(st.session_state.fc_order)
-if 'fc_pos' not in st.session_state:
     st.session_state.fc_pos = 0
-if 'fc_show_answer' not in st.session_state:
     st.session_state.fc_show_answer = False
-
-# Setup for the Test tab
-if 'test_birds' not in st.session_state:
-    st.session_state.test_birds = random.sample(st.session_state.birds, len(st.session_state.birds))
-if 'test_submitted' not in st.session_state:
+    
+    st.session_state.test_birds = random.sample(active_birds, len(active_birds))
     st.session_state.test_submitted = False
+    for key in list(st.session_state.keys()):
+        if key.startswith("test_ans_"):
+            del st.session_state[key]
+            
+    st.session_state.last_pool_names = current_pool_names
 
-# Flashcard Navigation Functions
+# --- NAVIGATION FUNCTIONS ---
 def next_flashcard():
-    # Move forward, wrap around to 0 if at the end
-    st.session_state.fc_pos = (st.session_state.fc_pos + 1) % len(st.session_state.birds)
+    st.session_state.fc_pos = (st.session_state.fc_pos + 1) % len(active_birds)
     st.session_state.fc_show_answer = False
 
 def prev_flashcard():
-    # Move backward, wrap around to the end if at 0
-    st.session_state.fc_pos = (st.session_state.fc_pos - 1) % len(st.session_state.birds)
+    st.session_state.fc_pos = (st.session_state.fc_pos - 1) % len(active_birds)
     st.session_state.fc_show_answer = False
 
 def shuffle_flashcards():
@@ -113,13 +130,16 @@ def shuffle_flashcards():
     st.session_state.fc_show_answer = False
 
 def retake_test():
-    st.session_state.test_birds = random.sample(st.session_state.birds, len(st.session_state.birds))
+    st.session_state.test_birds = random.sample(active_birds, len(active_birds))
     st.session_state.test_submitted = False
     for key in list(st.session_state.keys()):
         if key.startswith("test_ans_"):
             del st.session_state[key]
 
+
 # --- UI LAYOUT ---
+st.title("🌲 Birb Study Tool 🦉")
+
 tab1, tab2 = st.tabs(["🃏 Flashcards", "📝 Test"])
 
 # --- TAB 1: FLASHCARDS ---
@@ -132,13 +152,28 @@ with tab1:
     
     st.write("---")
     
-    # Grab the bird based on our current position in the shuffled deck
+    # Grab current bird safely
+    if st.session_state.fc_pos >= len(active_birds): 
+        st.session_state.fc_pos = 0
+        
     current_bird_idx = st.session_state.fc_order[st.session_state.fc_pos]
-    current_bird = st.session_state.birds[current_bird_idx]
+    current_bird = active_birds[current_bird_idx]
+    is_starred = current_bird["name"] in st.session_state.starred
     
-    # Counter to show progress
-    st.caption(f"Card {st.session_state.fc_pos + 1} of {len(st.session_state.birds)}")
+    # Header with Progress and Star Button
+    c_prog, c_star = st.columns([3, 1])
+    with c_prog:
+        st.caption(f"Card {st.session_state.fc_pos + 1} of {len(active_birds)}")
+    with c_star:
+        star_btn = st.button("⭐ Unstar" if is_starred else "☆ Star", key="star_toggle")
+        if star_btn:
+            if is_starred:
+                st.session_state.starred.remove(current_bird["name"])
+            else:
+                st.session_state.starred.add(current_bird["name"])
+            st.rerun()
     
+    # Media Display
     if show_pic:
         st.image(current_bird["image"], use_container_width=True)
     if show_aud:
@@ -177,7 +212,7 @@ with tab2:
     st.subheader("Test")
     
     if not st.session_state.test_submitted:
-        st.write(f"Test yourself on all {len(st.session_state.birds)} birds.")
+        st.write(f"Test yourself on {len(active_birds)} birds.")
         
         c_pic, c_aud = st.columns(2)
         c_pic.checkbox("Show Pictures", value=True, key="t_pic")
@@ -189,7 +224,6 @@ with tab2:
             for i, bird in enumerate(st.session_state.test_birds):
                 st.markdown(f"**{i+1}.**")
                 
-                # Use session_state directly to avoid scope issues later
                 if st.session_state.t_pic: st.image(bird["image"], use_container_width=True)
                 if st.session_state.t_aud: st.audio(bird["audio"])
                 
@@ -203,7 +237,6 @@ with tab2:
                 st.rerun()
 
     else:
-        # Grading Logic
         score = 0
         st.header("Test Results")
         
@@ -217,12 +250,11 @@ with tab2:
             else:
                 st.markdown(f"<div class='answer-box incorrect'><b>{i+1}. Incorrect</b><br>You wrote: <i>{user_answer}</i><br>Correct answer: <b>{bird['name']}</b></div>", unsafe_allow_html=True)
                 
-                # Fetch the checkbox states safely
                 if st.session_state.get("t_pic", True): st.image(bird["image"], use_container_width=True)
                 if st.session_state.get("t_aud", True): st.audio(bird["audio"])
         
         st.write("---")
-        st.subheader(f"Final Score: {score} / {len(st.session_state.birds)}")
+        st.subheader(f"Final Score: {score} / {len(active_birds)}")
         
         if st.button("Retake Test 🔄"):
             retake_test()
